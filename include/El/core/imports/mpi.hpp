@@ -190,7 +190,10 @@ void ResetAllPtrs(std::tuple<std::shared_ptr<Ts>...>& tup)
 struct DelayCtorType {};
 }// namespace internal
 
-struct Comm
+// FIXME: Work out a better solution to this issue.
+//
+// Ideally, stop passing comms by value!
+struct CommCtrlBlock
 {
 #ifdef HYDROGEN_ALUMINUM_USES_GPU
     using comm_ptr_tuple_type =
@@ -200,6 +203,11 @@ struct Comm
         internal::SharedPtrCommTuple<BackendsForDevice<Device::CPU>>;
 #endif // HYDROGEN_ALUMINUM_USES_GPU
 
+    comm_ptr_tuple_type al_comms;
+};
+
+struct Comm
+{
     // Hack to handle global objects, MPI_COMM could be int or void*...
     explicit Comm(internal::DelayCtorType const&,
                   MPI_Comm mpicomm) EL_NO_EXCEPT : comm(mpicomm) {}
@@ -231,11 +239,24 @@ struct Comm
         using BackendList = BackendsForDevice<Device::CPU>;
 #endif // HYDROGEN_ALUMINUM_USES_GPU
 
-        return *(std::get<internal::IndexInTypeList<BackendT,BackendList>::value>(al_comms));
+        auto& comm_ptr_tmp =
+            std::get<internal::IndexInTypeList<BackendT,BackendList>::value>(
+                al_comm_ctrl->al_comms);
+        if (!comm_ptr_tmp)
+        {
+            comm_ptr_tmp = std::make_shared<typename BackendT::comm_type>(
+                comm
+#ifdef HYDROGEN_ALUMINUM_USES_GPU
+                , GPUManager::Stream()
+#endif
+                );
+        }
+
+        return *(comm_ptr_tmp);
     }
 
     MPI_Comm comm;
-    comm_ptr_tuple_type al_comms;
+    std::shared_ptr<CommCtrlBlock> al_comm_ctrl;
 };
 
     // FIXME (trb): This could be more elegant.
@@ -245,7 +266,12 @@ inline typename Al::MPIBackend::comm_type& Comm::GetComm<Al::MPIBackend>()
     EL_NO_EXCEPT
 {
     // All GPU backend comm_types should work with CPU MPIBackend.
-    return *(std::get<0>(al_comms));
+    auto& comm_ptr = std::get<0>(al_comm_ctrl->al_comms);
+    using comm_type = typename std::remove_reference<decltype(comm_ptr)>::type::element_type;
+
+    if (! comm_ptr)
+        comm_ptr = std::make_shared<comm_type>(comm, GPUManager::Stream());
+    return *(comm_ptr);
 }
 #endif // HYDROGEN_ALUMINUM_USES_GPU
 
@@ -256,19 +282,21 @@ Comm::Comm(MPI_Comm mpiComm)
 #else
 Comm::Comm(MPI_Comm mpiComm) EL_NO_EXCEPT
 #endif
-: comm(mpiComm)
+    : comm(mpiComm),
+     al_comm_ctrl{std::make_shared<CommCtrlBlock>()}
 {
     Reinit();
 }
 
 inline void Comm::Reinit()
 {
-    internal::ConstructAllComms(al_comms,comm);
+    //internal::ConstructAllComms(al_comms,comm);
+    Reset();
 }
 
 inline void Comm::Reset()
 {
-    internal::ResetAllPtrs(al_comms);
+    al_comm_ctrl = std::make_shared<CommCtrlBlock>();
 }
 
 #endif // HYDROGEN_HAVE_ALUMINUM
