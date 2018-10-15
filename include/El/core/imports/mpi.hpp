@@ -190,10 +190,7 @@ void ResetAllPtrs(std::tuple<std::shared_ptr<Ts>...>& tup)
 struct DelayCtorType {};
 }// namespace internal
 
-// FIXME: Work out a better solution to this issue.
-//
-// Ideally, stop passing comms by value!
-struct CommCtrlBlock
+struct Comm
 {
 #ifdef HYDROGEN_ALUMINUM_USES_GPU
     using comm_ptr_tuple_type =
@@ -203,11 +200,6 @@ struct CommCtrlBlock
         internal::SharedPtrCommTuple<BackendsForDevice<Device::CPU>>;
 #endif // HYDROGEN_ALUMINUM_USES_GPU
 
-    comm_ptr_tuple_type al_comms;
-};
-
-struct Comm
-{
     // Hack to handle global objects, MPI_COMM could be int or void*...
     explicit Comm(internal::DelayCtorType const&,
                   MPI_Comm mpicomm) EL_NO_EXCEPT : comm(mpicomm) {}
@@ -241,7 +233,7 @@ struct Comm
 
         auto& comm_ptr_tmp =
             std::get<internal::IndexInTypeList<BackendT,BackendList>::value>(
-                al_comm_ctrl->al_comms);
+                *al_comms);
         if (!comm_ptr_tmp)
         {
             comm_ptr_tmp = std::make_shared<typename BackendT::comm_type>(
@@ -256,7 +248,7 @@ struct Comm
     }
 
     MPI_Comm comm;
-    std::shared_ptr<CommCtrlBlock> al_comm_ctrl;
+    std::shared_ptr<comm_ptr_tuple_type> al_comms;
 };
 
     // FIXME (trb): This could be more elegant.
@@ -266,7 +258,7 @@ inline typename Al::MPIBackend::comm_type& Comm::GetComm<Al::MPIBackend>()
     EL_NO_EXCEPT
 {
     // All GPU backend comm_types should work with CPU MPIBackend.
-    auto& comm_ptr = std::get<0>(al_comm_ctrl->al_comms);
+    auto& comm_ptr = std::get<0>(*al_comms);
     using comm_type = typename std::remove_reference<decltype(comm_ptr)>::type::element_type;
 
     if (! comm_ptr)
@@ -283,7 +275,7 @@ Comm::Comm(MPI_Comm mpiComm)
 Comm::Comm(MPI_Comm mpiComm) EL_NO_EXCEPT
 #endif
     : comm(mpiComm),
-     al_comm_ctrl{std::make_shared<CommCtrlBlock>()}
+     al_comms{std::make_shared<comm_ptr_tuple_type>()}
 {
     Reinit();
 }
@@ -296,7 +288,7 @@ inline void Comm::Reinit()
 
 inline void Comm::Reset()
 {
-    al_comm_ctrl = std::make_shared<CommCtrlBlock>();
+    al_comms = std::make_shared<comm_ptr_tuple_type>();
 }
 
 #endif // HYDROGEN_HAVE_ALUMINUM
