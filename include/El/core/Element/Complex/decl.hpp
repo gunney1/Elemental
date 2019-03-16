@@ -103,6 +103,34 @@ public:
 };
 #endif
 
+#ifdef HYDROGEN_HAVE_HALF
+#if 0 // Not yet
+template<>
+class Complex<cpu_half_type> : public std::complex<cpu_half_type>
+{
+public:
+    typedef cpu_half_type realType;
+    // TODO: Extend operators to other types?
+    using std::complex<realType>::operator=;
+    using std::complex<realType>::operator-=;
+    using std::complex<realType>::operator+=;
+    using std::complex<realType>::operator*=;
+    using std::complex<realType>::operator/=;
+
+    template<typename S>
+    inline Complex( const S& a );
+    template<typename S>
+    inline Complex( const Complex<S>& a );
+
+    template<typename S,typename T>
+    inline Complex( const S& a, const T& b );
+
+    inline Complex();
+    inline Complex( const std::complex<realType>& a );
+};
+#endif
+#endif
+
 #ifdef HYDROGEN_HAVE_QD
 template<>
 class Complex<DoubleDouble>

@@ -257,6 +257,18 @@ Quad Abs( const Complex<Quad>& alphaPre ) EL_NO_EXCEPT
 }
 #endif
 
+#ifdef HYDROGEN_HAVE_HALF
+#if 0 // Not ready yet
+cpu_half_type Abs( const cpu_half_type& alpha ) EL_NO_EXCEPT { return fabs(alpha); }
+
+cpu_half_type Abs( const Complex<cpu_half_type>& alphaPre ) EL_NO_EXCEPT
+{
+    std::complex<float> alpha(alphaPre.real(), alphaPre.imag());
+    return abs(alpha);
+}
+#endif
+#endif
+
 #ifdef HYDROGEN_HAVE_MPC
 BigInt Abs( const BigInt& alpha ) EL_NO_EXCEPT
 {

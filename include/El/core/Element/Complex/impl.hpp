@@ -231,6 +231,34 @@ Complex<Quad>::Complex( const std::complex<Quad>& a )
 { }
 #endif
 
+#ifdef HYDROGEN_HAVE_HALF
+#if 0 // Not yet
+// Complex<cpu_half_type>
+// =============
+template<typename S>
+Complex<cpu_half_type>::Complex( const S& a )
+: std::complex<cpu_half_type>(cpu_half_type(a))
+{ }
+
+template<typename S>
+Complex<cpu_half_type>::Complex( const Complex<S>& a )
+: std::complex<cpu_half_type>(cpu_half_type(a.real()),cpu_half_type(a.imag()))
+{ }
+
+template<typename S,typename T>
+Complex<cpu_half_type>::Complex( const S& a, const T& b )
+: std::complex<cpu_half_type>(cpu_half_type(a),cpu_half_type(b))
+{ }
+
+Complex<cpu_half_type>::Complex()
+: std::complex<cpu_half_type>()
+{ }
+Complex<cpu_half_type>::Complex( const std::complex<cpu_half_type>& a )
+: std::complex<cpu_half_type>(a)
+{ }
+#endif
+#endif
+
 #ifdef HYDROGEN_HAVE_QD
 // TODO: Avoid redundancy between DoubleDouble and QuadDouble impl's
 Complex<DoubleDouble>::Complex() { }
